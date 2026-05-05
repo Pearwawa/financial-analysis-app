@@ -2,56 +2,67 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- 1. เอกสารประกอบ: ตั้งค่าการแสดงผลหน้าเว็บ ---
-st.set_page_config(page_title="Financial AI Analysis", layout="wide")
+# 1. การตั้งค่าหน้าจอและหัวข้อ
+st.set_page_config(page_title="Financial AI Dashboard", layout="wide")
+st.title("📊 ระบบวิเคราะห์การเงินและประเมินความพร้อม IPO")
+st.markdown("---")
 
-def main():
-    st.title("📊 ระบบวิเคราะห์การเงินธุรกิจผลิตชั้นวาง")
-    st.markdown("วิเคราะห์ข้อมูล P&L, สภาพคล่อง และความพร้อม IPO จากไฟล์ Excel")
+# 2. ฟังก์ชันโหลดข้อมูล
+def load_data(file):
+    df = pd.read_excel(file, sheet_name='SO 2026')
+    df['วันที่ออกเอกสาร'] = pd.to_datetime(df['วันที่ออกเอกสาร'])
+    return df
 
-    # --- 2. เอกสารประกอบ: ฟังก์ชันอัปโหลดไฟล์ ---
-    uploaded_file = st.file_uploader("อัปโหลดไฟล์ test.xlsx ของคุณที่นี่", type=["xlsx"])
+# จำลองการอัปโหลดไฟล์ (ในที่นี้คือไฟล์ test.xlsx ที่คุณให้มา)
+try:
+    df = load_data('test.xlsx')
+    
+    # 3. ส่วนแสดงผลสรุป (Top Metrics)
+    col1, col2, col3, col4 = st.columns(4)
+    total_sales = df['รวมทั้งสิ้น'].sum()
+    total_balance = df['ยอดคงเหลือ'].sum()
+    total_customers = df['ชื่อลูกค้า'].nunique()
+    
+    col1.metric("ยอดขายรวม (Total Sales)", f"{total_sales:,.2f} บาท")
+    col2.metric("ยอดคงค้าง (Outstanding)", f"{total_balance:,.2f} บาท", delta_color="inverse")
+    col3.metric("จำนวนลูกค้า", f"{total_customers} ราย")
+    col4.metric("เป้าหมาย IPO (จำลอง)", "65%", delta="5%")
 
-    if uploaded_file is not None:
-        try:
-            # อ่านข้อมูลจาก Sheet 'SO 2026'
-            df = pd.read_excel(uploaded_file, sheet_name='SO 2026')
-            
-            # --- 3. เอกสารประกอบ: คำนวณตัวชี้วัดการเงิน (Finance Logic) ---
-            total_sales = df['รวมทั้งสิ้น'].sum()
-            total_balance = df['ยอดคงเหลือ'].sum()
-            collection_rate = ((total_sales - total_balance) / total_sales) * 100 if total_sales > 0 else 0
+    # 4. Interactive Dashboard
+    st.subheader("📈 การวิเคราะห์ข้อมูลรายได้และยอดค้างชำระ")
+    tab1, tab2 = st.tabs(["ยอดขายตามลูกค้า", "แนวโน้มรายเดือน"])
+    
+    with tab1:
+        # กราฟแท่งแสดงยอดขายตามชื่อลูกค้า
+        fig_cust = px.bar(df.groupby('ชื่อลูกค้า')['รวมทั้งสิ้น'].sum().reset_index(), 
+                          x='ชื่อลูกค้า', y='รวมทั้งสิ้น', title="ยอดขายแยกตามรายชื่อลูกค้า")
+        st.plotly_chart(fig_cust, use_container_width=True)
+        
+    with tab2:
+        # กราฟเส้นแสดงแนวโน้มรายได้
+        df_monthly = df.resample('M', on='วันที่ออกเอกสาร')['รวมทั้งสิ้น'].sum().reset_index()
+        fig_trend = px.line(df_monthly, x='วันที่ออกเอกสาร', y='รวมทั้งสิ้น', title="แนวโน้มรายได้รายเดือน")
+        st.plotly_chart(fig_trend, use_container_width=True)
 
-            # แสดงผล Metric สำคัญ
-            m1, m2, m3 = st.columns(3)
-            m1.metric("ยอดขายรวม (Revenue)", f"฿{total_sales:,.2f}")
-            m2.metric("ยอดค้างชำระ (AR)", f"฿{total_balance:,.2f}", delta_color="inverse")
-            m3.metric("อัตราการเก็บเงิน", f"{collection_rate:.2f}%")
+    # 5. ส่วนวิเคราะห์ความพร้อม IPO (IPO Readiness)
+    st.sidebar.header("📑 IPO Readiness Checklist")
+    ipo_sales_threshold = 300000000  # สมมติเกณฑ์ยอดขาย 300 ล้าน
+    is_sales_ok = total_sales > ipo_sales_threshold
+    
+    st.sidebar.write(f"ยอดขายถึงเกณฑ์: {'✅' if is_sales_ok else '❌'}")
+    st.sidebar.progress(min(int((total_sales/ipo_sales_threshold)*100), 100))
 
-            # --- 4. เอกสารประกอบ: สร้างกราฟ Interactive Dashboard ---
-            st.subheader("📈 วิเคราะห์ยอดขายรายลูกค้า")
-            fig = px.bar(df.groupby('ชื่อลูกค้า')['รวมทั้งสิ้น'].sum().reset_index(), 
-                         x='ชื่อลูกค้า', y='รวมทั้งสิ้น', color='รวมทั้งสิ้น',
-                         title="รายได้แยกตามรายชื่อลูกค้า (Top Customers)")
-            st.plotly_chart(fig, use_container_width=True)
+    # 6. AI Analysis (Chat Interface)
+    st.markdown("---")
+    st.subheader("🤖 สอบถาม AI เกี่ยวกับวิเคราะห์ทางการเงิน")
+    user_question = st.text_input("ตัวอย่าง: สรุปสถานะลูกหนี้ที่มียอดค้างชำระสูงที่สุดให้หน่อย")
+    
+    if user_question:
+        # ส่วนนี้ในอนาคตจะเชื่อมต่อกับ OpenAI API
+        st.info(f"AI กำลังวิเคราะห์ข้อมูลจากไฟล์ของคุณเพื่อตอบคำถาม: '{user_question}'")
+        # ตัวอย่างการตอบแบบ Logic เบื้องต้น
+        top_debtor = df.sort_values(by='ยอดคงเหลือ', ascending=False).iloc[0]
+        st.write(f"**คำแนะนำเบื้องต้น:** จากข้อมูลพบว่า {top_debtor['ชื่อลูกค้า']} มียอดค้างสูงสุดที่ {top_debtor['ยอดคงเหลือ']:,.2f} บาท")
 
-            # --- 5. เอกสารประกอบ: วิเคราะห์ความพร้อม IPO (IPO Readiness) ---
-            st.divider()
-            st.subheader("🏛️ การประเมินความพร้อมสู่ตลาดหลักทรัพย์ (IPO)")
-            ipo_threshold = 50000000  # สมมติเกณฑ์รายได้ 50 ล้านบาท
-            progress = min(total_sales / ipo_threshold, 1.0)
-            
-            st.write(f"เป้าหมายรายได้ขั้นต่ำ: {ipo_threshold:,.2f} บาท")
-            st.progress(progress)
-            
-            if total_sales >= ipo_threshold:
-                st.success("✅ ด้านรายได้: ผ่านเกณฑ์เบื้องต้นสำหรับการพิจารณา IPO")
-            else:
-                st.warning(f"⚠️ ด้านรายได้: ยังขาดอีก {ipo_threshold - total_sales:,.2f} บาท")
-
-        except Exception as e:
-            st.error(f"กรุณาตรวจสอบโครงสร้างไฟล์ Excel: {e}")
-
-# รันแอปพลิเคชัน
-if __name__ == "__main__":
-    main()
+except Exception as e:
+    st.error(f"กรุณาตรวจสอบไฟล์ข้อมูลของคุณ: {e}")
