@@ -1,0 +1,46 @@
+# setup_github.py
+
+# 1. สร้างไฟล์ .gitignore เพื่อความปลอดภัย
+gitignore_content = """
+# ข้อมูลส่วนตัวและไฟล์การเงิน
+test.xlsx
+*.xlsx
+*.csv
+
+# ไฟล์ระบบของ Python ที่ไม่ต้องเอาขึ้น GitHub
+__pycache__/
+.venv/
+.env
+"""
+with open(".gitignore", "w", encoding="utf-8") as f:
+    f.write(gitignore_content.strip())
+
+# 2. สร้างไฟล์ requirements.txt เพื่อระบุเครื่องมือที่ต้องใช้
+requirements_content = """
+pandas
+openpyxl
+plotly
+streamlit
+"""
+with open("requirements.txt", "w", encoding="utf-8") as f:
+    f.write(requirements_content.strip())
+
+# 3. สร้างไฟล์ README.md สำหรับอธิบายโปรเจ็กต์
+readme_content = """
+# 📊 Financial Sales & AR Dashboard
+ระบบวิเคราะห์ยอดขายและลูกหนี้คงค้างอัตโนมัติ เพื่อเตรียมความพร้อมสำหรับการ IPO
+
+### 🚀 ความสามารถของโปรแกรม
+* วิเคราะห์ยอดขายรายเดือนและรายบุคคล
+* คำนวณอายุลูกหนี้ (AR Aging) อัตโนมัติจากไฟล์ Excel
+* สรุปข้อมูลสำคัญ (Executive Summary) เพื่อส่งให้ AI (Claude) วิเคราะห์ต่อ
+
+### 🛠 วิธีการใช้งาน
+1. ติดตั้ง Library: `pip install -r requirements.txt`
+2. วางไฟล์ข้อมูลชื่อ `test.xlsx` ไว้ในโฟลเดอร์เดียวกัน
+3. รันโปรแกรม: `streamlit run app.py`
+"""
+with open("README.md", "w", encoding="utf-8") as f:
+    f.write(readme_content.strip())
+
+print("สร้างไฟล์ GitHub Setup เรียบร้อยแล้วครับ!")
