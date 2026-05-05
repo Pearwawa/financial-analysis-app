@@ -1,76 +1,103 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 
-# ตั้งค่าหน้าเว็บให้กว้างและสวยงาม
-st.set_page_config(layout="wide", page_title="Sales Order Dashboard 2026")
+# --- [1. Configuration & Styling] ---
+st.set_page_config(layout="wide", page_title="AI Sales Dashboard")
 
-# --- ส่วนที่ 1: หัวข้อแอป (Header) ---
-st.title("Sales Order Dashboard — ปี 2026")
-st.write("ข้อมูลจากไฟล์ SO_ป__2026 | รายการทั้งหมด 11,899 รายการ | ม.ค. - เม.ย. 2569")
-
-# --- ส่วนที่ 2: เมนูหลัก (Navigation Tabs) ---
-tabs = st.tabs(["ภาพรวม", "สถานะ SO", "แยกตาม Jobs", "พนักงานขาย", "รายเดือน", "ยอดคงค้าง"])
-
-with tabs[5]:  # หน้า "ยอดคงค้าง"
-    # --- ส่วนที่ 3: KPI Cards (4 ช่อง) ---
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # ฟังก์ชันช่วยสร้าง Card (จำลองข้อมูลตามรูป)
-    c1.metric("ยอดคงค้างรวม", "฿55.0M", "1,592 รายการ", delta_color="off")
-    c2.metric("ยอดคงค้าง 7-11", "฿36.3M", "65.9% ของทั้งหมด", delta_color="off")
-    c3.metric("ยอดคงค้างรายอื่นๆ", "฿18.7M", "34.1% ของทั้งหมด", delta_color="off")
-    c4.metric("ยังไม่ออก Invoice", "฿54.4M", "1,582 รายการ รอดำเนินการ")
-
-    st.markdown("---")
-
-    # --- ส่วนที่ 4: กราฟ Donut และ Bar Chart (จัดวางคู่กัน) ---
-    col_graph1, col_graph2 = st.columns(2)
-
-    with col_graph1:
-        st.subheader("ยอดคงค้างแยกตาม Jobs")
-        # สร้างกราฟ Donut ด้วย Plotly Go เพื่อความเป๊ะของสี
-        labels = ['7-11', 'Suratthani', '7-Project', 'Chains', 'Khonkaen', 'General', 'Other']
-        values = [17.1, 6.8, 6.4, 8.1, 5.8, 4.0, 5.0]
-        colors = ['#10A37F', '#D18227', '#4A90E2', '#A37F10', '#9B51E0', '#7F7F7F', '#A5D6A7']
-        
-        fig_donut = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.6, marker_colors=colors)])
-        fig_donut.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0))
-        st.plotly_chart(fig_donut, use_container_width=True)
-
-    with col_graph2:
-        st.subheader("สถานะที่ยังรอดำเนินการ")
-        # กราฟแท่งแสดงยอดเงิน
-        bar_data = pd.DataFrame({
-            'สถานะ': ['ยังไม่ออก INV', 'เปิด INV ยังไม่วางบิล'],
-            'มูลค่า (ล้าน)': [54.4, 105.0]
-        })
-        fig_bar = px.bar(bar_data, x='สถานะ', y='มูลค่า (ล้าน)', color='สถานะ',
-                         color_discrete_map={'ยังไม่ออก INV': '#D18227', 'เปิด INV ยังไม่วางบิล': '#9B51E0'})
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    # --- ส่วนที่ 5: ตารางสรุปด้านล่าง ---
-    st.subheader("ยอดคงค้างแยกตาม Jobs (จากข้อมูล Summary)")
-    
-    # สร้างตารางจำลอง (คุณสามารถเปลี่ยนเป็นข้อมูลจาก df จริงได้)
-    table_data = {
-        "Jobs": ["7-Eleven", "Suratthani", "7-Project", "Chains", "Khonkaen"],
-        "ยอดคงค้าง (฿)": ["17,139,958", "6,858,329", "6,420,422", "8,148,601", "5,839,203"],
-        "สัดส่วน": [0.8, 0.4, 0.35, 0.45, 0.3],
-        "สถานะ": ["ค้างสูง", "ติดตาม", "ติดตาม", "ติดตาม", "ปกติ"]
+# CSS สำหรับตกแต่ง Card ให้เหมือนในรูปภาพ
+st.markdown("""
+    <style>
+    .kpi-card {
+        background-color: #fdfdfb;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #eeeeee;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.02);
+        margin-bottom: 15px;
     }
-    df_table = pd.DataFrame(table_data)
+    .kpi-title { font-size: 14px; color: #555; margin-bottom: 8px; }
+    .kpi-value { font-size: 26px; font-weight: bold; margin-bottom: 4px; }
+    .kpi-count { font-size: 12px; color: #888; }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- [2. Data Processing Logic] ---
+def process_data(file):
+    try:
+        df = pd.read_excel(file)
+        # ทำความสะอาดชื่อคอลัมน์
+        df.columns = [c.strip() for c in df.columns]
+        # แปลงตัวเลขให้ถูกต้อง
+        if 'รวมทั้งสิ้น' in df.columns:
+            df['รวมทั้งสิ้น'] = pd.to_numeric(df['รวมทั้งสิ้น'], errors='coerce').fillna(0)
+        return df
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
+
+# --- [3. UI Helper Functions] ---
+def render_kpi_card(title, amount, count, color):
+    # ฟังก์ชันสร้าง HTML สำหรับ Card
+    st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">{title}</div>
+            <div class="kpi-value" style="color: {color};">฿{amount:,.1f}M</div>
+            <div class="kpi-count">{count:,} รายการ</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+# --- [4. Main Application] ---
+st.title("📊 ระบบวิเคราะห์ข้อมูลการขายและลูกหนี้")
+
+# ส่วนอัปโหลดไฟล์ที่ Sidebar
+uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ test_4.xlsx", type=['xlsx'])
+
+if uploaded_file:
+    df = process_data(uploaded_file)
     
-    # แสดงตารางด้วย Column Configuration (มีแถบ Progress)
-    st.data_editor(
-        df_table,
-        column_config={
-            "สัดส่วน": st.column_config.ProgressColumn(
-                "สัดส่วน", help="เปอร์เซ็นต์ยอดคงค้างเทียบกับยอดขาย",
-                format="%.2f", min_value=0, max_value=1
-            ),
-        },
-        hide_index=True,
-        use_container_width=True
-    )
+    if df is not None:
+        # ระบบ Navigation แบบปุ่มกด (Active State)
+        if 'active_tab' not in st.session_state:
+            st.session_state.active_tab = "สถานะ SO"
+
+        menu = ["ภาพรวม", "สถานะ SO", "แยกตาม Jobs", "พนักงานขาย", "รายเดือน", "ยอดคงค้าง"]
+        cols = st.columns(len(menu))
+        
+        for i, item in enumerate(menu):
+            # ปุ่มที่เลือกจะเป็นสีเข้ม (primary) ปุ่มอื่นจะเป็นสีเทาปกติ
+            btn_type = "primary" if st.session_state.active_tab == item else "secondary"
+            if cols[i].button(item, use_container_width=True, type=btn_type):
+                st.session_state.active_tab = item
+                st.rerun()
+
+        st.markdown("---")
+
+        # แสดงเนื้อหาตามหน้าที่เลือก
+        if st.session_state.active_tab == "สถานะ SO":
+            # รายการสถานะที่ต้องการแสดงตามรูปภาพ
+            status_targets = [
+                {"name": "ชำระเงินครบแล้ว", "color": "#10A37F"},
+                {"name": "วางบิลแล้ว", "color": "#4A90E2"},
+                {"name": "เปิด INV ยังไม่วางบิล", "color": "#9B51E0"},
+                {"name": "ยังไม่ได้เปิดอินวอย", "color": "#D18227"},
+                {"name": "ชำระแล้วบางส่วน", "color": "#E67E22"},
+                {"name": "ยกเลิก", "color": "#7F8C8D"}
+            ]
+
+            # วนลูปสร้าง Card 4 คอลัมน์ต่อแถว
+            for i in range(0, len(status_targets), 4):
+                cols = st.columns(4)
+                for j in range(4):
+                    if i + j < len(status_targets):
+                        target = status_targets[i + j]
+                        # กรองข้อมูลตามสถานะ
+                        sub_df = df[df['สถานะ'] == target['name']]
+                        total_m = sub_df['รวมทั้งสิ้น'].sum() / 1_000_000 # แปลงเป็นหน่วยล้าน (M)
+                        count = len(sub_df)
+                        
+                        with cols[j]:
+                            render_kpi_card(target['name'], total_m, count, target['color'])
+        else:
+            st.info(f"ยินดีต้อนรับสู่หน้า: {st.session_state.active_tab} (ส่วนนี้สามารถเพิ่มกราฟหรือตารางได้ตามต้องการค่ะ)")
+else:
+    st.warning("👈 กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มต้นการวิเคราะห์ค่ะ")
